@@ -201,6 +201,9 @@ header .name { font-size: 17px; font-weight: 600; flex: 1; min-width: 0; }
 @keyframes bob { 50% { transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .logo-img { animation: none; } }
 .slot .ttl { font-size: 13px; line-height: 1.4; }
+.slot.got { cursor: pointer; font: inherit; color: inherit; text-align: left; }
+@media (hover: hover) { .slot.got:hover { background: color-mix(in srgb, var(--heart) 8%, var(--choice)); } }
+.slot .replay { font-size: 12px; color: var(--heart); margin-top: auto; }
 
 @media (prefers-reduced-motion: reduce) { .round, #call-end.ready, .shake { animation: none !important; } .pop, .toast, .typing i { animation: none; } .menu button { transition: none; } }
 </style>
@@ -408,9 +411,9 @@ const SCRIPT = {
   day5: {
     msgs: [{ day: "5일차", clock: [18, 5] }, { him: "성민아" }, { him: "아까 강의실에서 하려던 말 뭐야?" }],
     choices: [
-      { text: "저 형 좋아하는 거 같아요", alt: { flag: "confess", text: "형 제가 한 고백 생각해보셨어요?" }, d: +1, then: [], next: "END" },
-      { text: "형이랑 저랑 잘 안 맞는 거 같아요", d: -10, then: [], next: "END" },
-      { text: "아무 것도 아닙니당~~", d: 0, then: [], next: "END" }
+      { text: "저 형 좋아하는 거 같아요", alt: { flag: "confess", text: "형 제가 한 고백 생각해보셨어요?" }, d: +1, then: [{ him: "아…" }, { him: "성민아" }, { him: "형한테 생각할 시간을 줄래?" }], next: "END" },
+      { text: "형이랑 저랑 잘 안 맞는 거 같아요", d: -10, then: [{ him: "아…" }, { him: "그래…?" }, { him: "ㅎㅎ" }], next: "END" },
+      { text: "아무 것도 아닙니당~~", d: 0, then: [{ him: "뭐야 ㅎㅎ" }], next: "END" }
     ]
   }
 };
@@ -691,7 +694,8 @@ function runCall(lines, id) {
 async function showEnd() {
   const id = runId;
   const e = endingFor(state.score);
-  showWaiting();
+  skipping = false;
+  choicesEl.innerHTML = `<div class="waiting">…</div>`;
   await sleep(900);
   addLine("day", "ENDING");
   if (!(await play(e.seq, id))) return;
@@ -701,6 +705,8 @@ async function showEnd() {
   document.getElementById("end-label").textContent = `ENDING ${e.id}`;
   document.getElementById("end-title").textContent = `<${e.title}>`;
   document.getElementById("end-score").textContent = `최종 호감도 ♥ ${state.score}`;
+  document.getElementById("end-score").hidden = false;
+  document.getElementById("log").hidden = false;
   const log = document.getElementById("log"); log.innerHTML = "";
   state.log.forEach(([t, d]) => {
     const li = document.createElement("li");
@@ -715,15 +721,37 @@ async function showEnd() {
 const titleEl = document.getElementById("title");
 function refreshMenu() { document.getElementById("btn-continue").hidden = !hasSave(); }
 function showTitle() { runId++; skipping = false; document.getElementById("end").hidden = true; document.getElementById("call").hidden = true; refreshMenu(); titleEl.hidden = false; startPetals(); }
+async function replayEnding(e) {
+  document.getElementById("gallery-screen").hidden = true;
+  titleEl.hidden = true; stopPetals();
+  runId++; skipping = false; snap = null;
+  const id = runId;
+  state = { score: 0, flags: {}, log: [], clock: [22, 14] };
+  lastWho = null; chat.innerHTML = "";
+  scoreEl.textContent = "–";
+  document.getElementById("end").hidden = true;
+  document.getElementById("call").hidden = true;
+  choicesEl.innerHTML = `<div class="waiting">…</div>`;
+  await sleep(500);
+  addLine("day", "ENDING");
+  if (!(await play(e.seq, id))) return;
+  choicesEl.innerHTML = `<div class="waiting">이야기가 끝났어요</div>`;
+  document.getElementById("end-label").textContent = `ENDING ${e.id}`;
+  document.getElementById("end-title").textContent = `<${e.title}>`;
+  document.getElementById("end-score").hidden = true;
+  document.getElementById("log").hidden = true;
+  setTimeout(() => { if (id === runId) document.getElementById("end").hidden = false; }, 700);
+}
 function startGame() { titleEl.hidden = true; stopPetals(); snap = null; reset(); }
 function openGallery() {
   const g = document.getElementById("gallery"); g.innerHTML = "";
   ENDINGS.forEach(e => {
     const has = got.includes(e.id);
-    const s = document.createElement("div");
+    const s = document.createElement(has ? "button" : "div");
     s.className = "slot " + (has ? "got" : "locked");
+    if (has) { s.type = "button"; s.addEventListener("click", () => replayEnding(e)); }
     s.innerHTML = has
-      ? `<span class="tag">♥ 획득</span><b>${e.name}</b><span class="ttl">&lt;${e.title}&gt;</span><small>${e.range}</small>`
+      ? `<span class="tag">♥ 획득</span><b>${e.name}</b><span class="ttl">&lt;${e.title}&gt;</span><small>${e.range}</small><span class="replay">▶ 다시 보기</span>`
       : `<span class="tag" style="color:var(--ink-soft)">미획득</span><b>???</b><small>${e.range}</small>`;
     g.append(s);
   });
